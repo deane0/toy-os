@@ -5,3 +5,10 @@ authors = ["Deane Leung"]
 edition = "2021"
 
 [dependencies]
+
+[features]
+board_qemu = []
+board_k210 = []
+
+[profile.release]
+debug = true
