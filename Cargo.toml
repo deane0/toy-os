@@ -1,0 +1,7 @@
+[package]
+name = "toy-os"
+version = "0.1.0"
+authors = ["Deane Leung"]
+edition = "2021"
+
+[dependencies]
