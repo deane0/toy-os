@@ -1,14 +1,5 @@
-[package]
-name = "toy-os"
-version = "0.1.0"
-authors = ["Deane Leung"]
-edition = "2021"
-
-[dependencies]
-
-[features]
-board_qemu = []
-board_k210 = []
+[workspace]
+members = ["os", "user"]
 
 [profile.release]
 debug = true

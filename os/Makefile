@@ -1,30 +1,19 @@
+# Building
 TARGET := riscv64gc-unknown-none-elf
 MODE := release
-
-OS_NAME := os
-
-TARGET_DIR := target/$(TARGET)/$(MODE)
-
-KERNEL_ELF := $(TARGET_DIR)/$(OS_NAME)
-KERNEL_BIN := images/kernel/$(OS_NAME).bin
+KERNEL_ELF := ../target/$(TARGET)/$(MODE)/os
+KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
-
-APPS_DIR := user/src/bin
-APP_IMAGES_DIR := images/user
-
-APPS := $(wildcard $(APPS_DIR)/*.rs)
-APP_ELFS := $(patsubst $(APPS_DIR)/%.rs, $(TARGET_DIR)/%, $(APPS))
-APP_BINS := $(patsubst $(APPS_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(APPS))
 
 # Building mode argument
 ifeq ($(MODE), release)
 	MODE_ARG := --release
 endif
 
-# Board
+# BOARD
 BOARD ?= qemu
 SBI ?= rustsbi
-BOOTLOADER := ./bootloader/$(SBI)-$(BOARD).bin
+BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
 K210_BOOTLOADER_SIZE := 131072
 
 # KERNEL ENTRY
@@ -45,18 +34,7 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 # Disassembly
 DISASM ?= -x
 
-app_elf:
-	@export RUSTFLAGS="-Clink-arg=-Tuser/src/linker.ld" && \
-	cargo build --package user --release
-	@echo $(APPS)
-	@echo $(APP_ELFS)
-	@echo $(APP_BINS)
-
-build-apps: app_elf
-	$(foreach elf, $(APP_ELFS), $(OBJCOPY) $(elf) --strip-all -O binary $(patsubst $(TARGET_DIR)/%, $(APP_IMAGES_DIR)/%.bin, $(elf));)
-
-# Build OS
-build-os: switch-check $(KERNEL_BIN)
+build: env switch-check $(KERNEL_BIN)
 
 switch-check:
 ifeq ($(BOARD), qemu)
@@ -76,10 +54,9 @@ $(KERNEL_BIN): kernel
 
 kernel:
 	@echo Platform: $(BOARD)
-	@cp os/src/linker-$(BOARD).ld os/src/linker.ld
-	@export RUSTFLAGS="-Clink-arg=-Tos/src/linker.ld -Cforce-frame-pointers=yes" && \
-	cargo build --package os $(MODE_ARG) --features "board_$(BOARD)"
-	@rm os/src/linker.ld
+	@cp src/linker-$(BOARD).ld src/linker.ld
+	@cargo build $(MODE_ARG) --features "board_$(BOARD)"
+	@rm src/linker.ld
 
 clean:
 	@cargo clean
@@ -94,7 +71,9 @@ disasm-vim: kernel
 
 run: run-inner
 
-run-inner: build-os
+	
+
+run-inner: build
 ifeq ($(BOARD),qemu)
 	@qemu-system-riscv64 \
 		-machine virt \
@@ -111,16 +90,16 @@ else
 	python3 -m serial.tools.miniterm --eol LF --dtr 0 --rts 0 --filter direct $(K210-SERIALPORT) 115200
 endif
 
-debug: build-os
+debug: build
 	@tmux new-session -d \
 		"qemu-system-riscv64 -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) -s -S" && \
 		tmux split-window -h "riscv64-unknown-elf-gdb -ex 'file $(KERNEL_ELF)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'" && \
 		tmux -2 attach-session -d
 
-gdbserver: build-os
+gdbserver: build
 	@qemu-system-riscv64 -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) -s -S
 
 gdbclient:
 	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_ELF)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
-.PHONY: build-os env kernel clean disasm disasm-vim run-inner switch-check gdbserver gdbclient
+.PHONY: build env kernel clean disasm disasm-vim run-inner switch-check gdbserver gdbclient

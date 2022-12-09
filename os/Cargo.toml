@@ -1,0 +1,13 @@
+[package]
+name = "os"
+version = "0.1.0"
+authors = ["Deane Leung"]
+edition = "2021"
+
+[dependencies]
+riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
+lazy_static = { version = "1.4", features = ["spin_no_std"] }
+
+[features]
+board_qemu = []
+board_k210 = []
